@@ -1,0 +1,32 @@
+# ---- .NET build output ----
+bin/
+obj/
+*.user
+*.suo
+
+# ---- Local PKHeX.Core reference (do NOT commit) ----
+# Provide your own PKHeX.Core.dll in refs/ to build (matches your PKHeX version).
+refs/
+*.dll
+# ...but allow shipping the built plugin as a release artifact if you keep one in /dist:
+!dist/OTHandlerPlugin.dll
+
+# ---- IDE / editor ----
+.vs/
+.idea/
+.vscode/
+*.swp
+
+# ---- OS cruft ----
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---- PKHeX runtime/user files that may sit next to the DLL ----
+OTHandlerPlugin.json
+*.pdb
+*.pk9
+*.pk8
+*.pk7
+*.sav
+*.bak
