@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -6,12 +7,12 @@ using PKHeX.Core;
 namespace OTHandlerPlugin;
 
 /// <summary>
-/// PKHeX plugin: one-click OT/HT ownership pass for the loaded boxes.
-/// Owner trainer comes from Settings - either auto-detected (most common OT+ID in the
-/// loaded boxes) or set manually. Tools -> OT/HT Ownership -> Apply / Settings.
-///   - Owner's Pokemon -> cleared to pure-OT (no HT) if it stays legal.
-///   - Everything else  -> Handling Trainer set to the owner.
-///   - Anything that would become illegal is left exactly as-is.
+/// PKHeX plugin: one-click OT/HT ownership pass for the loaded boxes — all entity formats.
+/// Owner trainer comes from Settings (auto-detected as the most common OT+ID in the boxes, or set manually).
+///   - Owner's Pokemon  -> cleared to pure-OT (no HT) if it stays legal.
+///   - Everything else  -> Handling Trainer set to the owner (formats that support an HT).
+///   - Anything that would become illegal, or formats without an HT, are left exactly as-is.
+/// Works across PK6/PK7/PB7/PK8/PB8/PA8/PK9 via base PKM + per-generation interfaces.
 /// </summary>
 public sealed class OTHandlerPlugin : IPlugin
 {
@@ -53,7 +54,7 @@ public sealed class OTHandlerPlugin : IPlugin
     private void OpenSettings()
     {
         using var f = new SettingsForm(_cfg);
-        f.ShowDialog(); // SettingsForm writes back into _cfg and saves to disk on Save
+        f.ShowDialog();
     }
 
     private void Run()
@@ -117,7 +118,6 @@ public sealed class OTHandlerPlugin : IPlugin
         sav.BoxData = data;
         SaveFileEditor.ReloadSlots();
 
-        // optional: dump boxes to a folder
         string dumpMsg = "";
         if (_cfg.DumpAfterApply)
         {
@@ -141,57 +141,47 @@ public sealed class OTHandlerPlugin : IPlugin
             $"Processed {total} Pokémon:\n\n" +
             $"   {pure}  owner's  -> pure-OT (HT cleared, owner is the handler)\n" +
             $"   {htSet}  others   -> HT = {ownerName}\n" +
-            $"   {kept}  kept as-is (clearing would make them illegal)\n" +
+            $"   {kept}  kept as-is (would be illegal, or no HT support)\n" +
             dumpMsg + "\n" +
             "All results are legality-checked." +
             (_cfg.DumpAfterApply ? "" : " Remember to save / export your boxes."),
             Name, MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
-    private static int DumpBoxes(SaveFile sav, string folder)
-    {
-        Directory.CreateDirectory(folder);
-        int n = 0;
-        foreach (var pk in sav.BoxData)
-        {
-            if (pk is not PK9 g9 || g9.Species == 0)
-                continue;
-            File.WriteAllBytes(Path.Combine(folder, g9.FileName), g9.Data.ToArray());
-            n++;
-        }
-        return n;
-    }
-
     private static PKM Choose(PKM orig, string ownerName, uint ownerID32, byte ownerGender, byte ownerLang,
                               ref int pure, ref int htSet, ref int kept)
     {
-        if (orig is not PK9) // SV boxes are .pk9; leave anything else untouched
-        {
-            kept++;
-            return orig;
-        }
-        var pk = (PK9)orig.Clone();
-        bool mine = pk.OriginalTrainerName == ownerName && pk.ID32 == ownerID32;
+        bool mine = orig.OriginalTrainerName == ownerName && orig.ID32 == ownerID32;
+        bool hasHT = orig.Format >= 6; // Handling Trainer exists from Gen 6 onward
+
+        var pk = orig.Clone();
         if (mine)
         {
             pk.CurrentHandler = 0;
-            pk.HandlingTrainerName = string.Empty;
-            pk.HandlingTrainerGender = 0;
-            pk.HandlingTrainerLanguage = 0;
-            pk.HandlingTrainerFriendship = 0;
-            pk.HandlingTrainerMemory = 0;
-            pk.HandlingTrainerMemoryIntensity = 0;
-            pk.HandlingTrainerMemoryFeeling = 0;
-            pk.HandlingTrainerMemoryVariable = 0;
-            pk.HandlingTrainerID = 0;
+            if (hasHT)
+            {
+                pk.HandlingTrainerName = string.Empty;
+                pk.HandlingTrainerGender = 0;
+                pk.HandlingTrainerFriendship = 0;
+                if (pk is IHandlerLanguage hl) hl.HandlingTrainerLanguage = 0;
+                if (pk is IMemoryHT m)
+                {
+                    m.HandlingTrainerMemory = 0;
+                    m.HandlingTrainerMemoryIntensity = 0;
+                    m.HandlingTrainerMemoryFeeling = 0;
+                    m.HandlingTrainerMemoryVariable = 0;
+                }
+                TrySet(pk, "HandlingTrainerID", 0);
+            }
         }
         else
         {
+            if (!hasHT) { kept++; return orig; } // can't re-home a foreign-OT mon without an HT slot
             pk.HandlingTrainerName = ownerName;
             pk.HandlingTrainerGender = ownerGender;
-            pk.HandlingTrainerLanguage = ownerLang;
             pk.HandlingTrainerFriendship = 255;
             pk.CurrentHandler = 1;
+            if (pk is IHandlerLanguage hl) hl.HandlingTrainerLanguage = ownerLang;
         }
         pk.RefreshChecksum();
 
@@ -202,5 +192,27 @@ public sealed class OTHandlerPlugin : IPlugin
         }
         kept++;
         return orig;
+    }
+
+    // set a property by name if the entity has it (e.g. HandlingTrainerID, which has no shared interface)
+    private static void TrySet(object o, string prop, object val)
+    {
+        var p = o.GetType().GetProperty(prop);
+        if (p != null && p.CanWrite)
+            p.SetValue(o, Convert.ChangeType(val, p.PropertyType));
+    }
+
+    private static int DumpBoxes(SaveFile sav, string folder)
+    {
+        Directory.CreateDirectory(folder);
+        int n = 0;
+        foreach (var pk in sav.BoxData)
+        {
+            if (pk == null || pk.Species == 0)
+                continue;
+            File.WriteAllBytes(Path.Combine(folder, pk.FileName), pk.Data.ToArray());
+            n++;
+        }
+        return n;
     }
 }

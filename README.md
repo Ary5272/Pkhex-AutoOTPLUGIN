@@ -31,7 +31,9 @@ That's the entire install — it's a single self-contained DLL.
 
 ## Compatibility
 
-Built against **PKHeX 26.05.05** (build `20260505`, .NET 10). Other PKHeX versions may require a rebuild against their `PKHeX.Core` (the `IPlugin` interface changes between versions).
+**All entity formats:** works on every `.pkX` that has a Handling Trainer — PK6, PK7, PB7, PK8, PB8, PA8, PK9 — applying the right HT fields per generation (language on Gen 8+, memories on Gen 6+). Formats without an HT (Gen 1–5) are left untouched.
+
+Built against **PKHeX 26.05.05** (build `20260505`, .NET 10). The DLL targets one PKHeX major version at a time — other PKHeX versions may need a rebuild against their `PKHeX.Core` (the `IPlugin` interface changes between versions).
 
 ## Build from source
 
@@ -58,7 +60,7 @@ A mon is "yours" when its **OT name and full ID (TID/SID)** match the configured
 ## Notes
 
 - Settings persist to `OTHandlerPlugin.json` next to the DLL.
-- SV (`.pk9`) entities only; other formats in the boxes are left untouched.
+- Formats without a Handling Trainer (Gen 1–5) are left untouched; all HT-capable formats are handled.
 - Not affiliated with the PKHeX project. Use on copies/backups.
 
 ## License
