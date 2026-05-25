@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>OTHandlerPlugin</AssemblyName>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Version>1.0.0</Version>
+    <Authors>Arynukz</Authors>
+    <Product>OT/HT Ownership Plugin for PKHeX</Product>
+    <Description>One-click OT/HT ownership pass for PKHeX boxes: owner's mons -> pure-OT, everything else -> HT=owner; every result legality-checked. Auto-detect or manual trainer, optional dump-to-folder.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Build against your PKHeX's own Core (drop PKHeX.Core.dll in ..\refs\). Not shipped: the GUI provides it at runtime. -->
+    <Reference Include="PKHeX.Core">
+      <HintPath>..\refs\PKHeX.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
